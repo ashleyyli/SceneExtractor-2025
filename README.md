@@ -13,3 +13,12 @@ The original similarity metric and frame sampling code is from ClassTranscribe,
 https://github.com/classtranscribe/WebAPI/blob/1274d4ee7599ba5943d95929eb6a97f5f9a23454/PythonRpcServer/scenedetector.py
 
 ## Example use
+Run SceneExtractor on a single file
+```python
+python main.py example.mp4
+```
+
+Run SceneExtractor for all files in a folder
+```python
+python main.py foldername
+```

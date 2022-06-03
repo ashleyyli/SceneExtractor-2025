@@ -1,22 +1,36 @@
-import os
+import os.path
 import sys
-import decord
+import glob
+import scenedetector as sd
 
 def process_one_file(file):
-    #vr_full = decord.VideoReader(video_path, ctx=decord.cpu(0))   
-    # Call ClassTranscribe  https://github.com/classtranscribe/WebAPI/blob/staging/PythonRpcServer/scenedetector.py
+    """
+    Run SceneExtractor for a single file. The extracted scenes are stored in the current directory.
+
+    Parameters:
+    file (string): filename
+    """
+
+    sd.find_scenes(file)
 
 def process_dir(path):
+    """
+    Run SceneExtractor for all files in a directory. The extracted scenes are stored in the current directory.
+
+    Parameters:
+    path (string): director path
+    """
     files = glob.glob(path+"/*.mp4")
     for file in files:
         process_one_file(file)
 
-def main():
-    if os.isdir(source):
+def main(source):
+    if os.path.isdir(source):
         process_dir(source)
-    elif os.isfile(source):
+    elif os.path.isfile(source):
         process_one_file(source)
     else: print("Cannot open " + source)
 
 if __name__ == '__main__' :
-    main()
+    args = sys.argv[1:]
+    main(args[0])
