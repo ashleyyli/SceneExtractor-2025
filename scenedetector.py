@@ -164,7 +164,9 @@ def calculate_score(sim_structural, sim_ocr, sim_structural_no_face, svm_name):
     sim_combined = np.array(sim_combined)
 
     # Load the SVM Model
-    loaded_clf = pickle.load(open(svm_name, 'rb'))
+    with open(svm_name, 'rb') as f:
+        loaded_clf = pickle.load(f)
+        
     predicted_labels = loaded_clf.predict(sim_combined)
 
     return predicted_labels
