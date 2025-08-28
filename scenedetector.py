@@ -4,6 +4,8 @@ import json
 import numpy as np
 import pytesseract
 import titledetector as td
+import annotationshandler as ah
+import scrollhandler as sh
 import cv2
 import decord
 import pickle
@@ -15,6 +17,7 @@ from mtcnn_cv2 import MTCNN
 
 
 DATA_DIR = os.getcwd()
+DATA_DIR_NAME = 'frames_phaseflann'
 TARGET_FPS = 0.5
 SCENE_DETECT_USE_FACE = 'true'
 SCENE_DETECT_USE_OCR = 'true'
@@ -188,7 +191,7 @@ def generate_frame_similarity(video_path, num_samples, everyN, start_time):
     List of float: sim_ocr array of each sample frame
     """
 
-    SIM_OCR_CONFIDENCE = 55  # OCR confidnece used to generate sim_ocr
+    SIM_OCR_CONFIDENCE = 55  # OCR confidence used to generate sim_ocr
     DROP_THRESHOLD = 0.95  # Minimum sim_structural confidnece to conclude no scene changes
 
     # Stores the last frame read
@@ -308,7 +311,7 @@ def generate_frame_similarity(video_path, num_samples, everyN, start_time):
             del last_frame
         last_frame = curr_frame
 
-        # One or more these prevents a memory leak. (16GB over 10,000 samples)
+    # One or more these prevents a memory leak. (16GB over 10,000 samples)
     if SCENE_DETECT_USE_OCR:
         del curr_face_detection_result
         del last_ocr
@@ -336,13 +339,13 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
     string: Features of detected scene as JSOH
     """
 
-    OCR_CONFIDENCE = 80  # OCR confidnece used to extract text in detected scenes. Higher confidence to extract insightful information
+    OCR_CONFIDENCE = 80  # OCR confidence used to extract text in detected scenes. Higher confidence to extract insightful information
 
     # we don't want the '.mp4' extension (if it exists)
     short_file_name = video_path[
         video_path.rfind('/') + 1: video_path.find('.')]
 
-    out_directory = os.path.join(DATA_DIR, 'frames', short_file_name)
+    out_directory = os.path.join(DATA_DIR, DATA_DIR_NAME, short_file_name)
 
     # Initialize list of scenes
     scenes = []
@@ -365,8 +368,10 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
     vr_full = decord.VideoReader(video_path, ctx=decord.cpu(0))
 
     for i, scene in enumerate(scenes):
-        requested_frame_number = (
-            scene['frame_start'] + scene['frame_end']) // 2
+        # requested_frame_number = (
+        #     scene['frame_start'] + scene['frame_end']) // 2
+
+        requested_frame_number = scene['frame_end']  
 
         t = perf_counter()
         if t >= last_log_time + 30:
@@ -403,7 +408,7 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
         if len(phrase) > 0:
             phrases.append(' '.join(phrase))
 
-            # Title generation
+        # Title generation
         frame_height, frame_width, frame_channels = frame.shape
         title = td.title_detection(str_text, frame_height, frame_width)
 
@@ -523,11 +528,32 @@ def find_scenes(video_path):
         if num_samples > 1:
             sample_cuts += [num_samples - 1]
 
-        # Now work in frames again. Make sure we are using regular ints (not numpy ints) other json serialization will fail
+        # Now work in frames again. Make sure we are using regular ints (not numpy ints) otherwise json serialization will fail
         frame_cuts = [int(s * everyN) for s in sample_cuts]
 
+        # Filter out frames differing only by scrolling
+        # there must be a better way to get height and width
+        cap = cv2.VideoCapture(video_path)
+        ret,frame = cap.read()
+        h, w, channels = frame.shape
+        cap.release()
+        filtered_frame_cuts = sh.filter_scrolling(video_path, frame_cuts, w, h)
+
+        # print(filtered_frame_cuts[0].dtype)
+        filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
+        
+        # Filter out frames differing only by annotations
+        # filtered_frame_cuts = ah.filter_annotations(video_path, frame_cuts)
+
         # Image Extraction and OCR
-        scenes = extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_time)
+        scenes = extract_scene_information(video_path, timestamps, filtered_frame_cuts, everyN, start_time)
+
+        # Full JSON output 
+        json_name = short_file_name + '.json'
+        json_out = os.path.join(DATA_DIR, DATA_DIR_NAME, short_file_name, json_name)
+        with open(json_out, 'w') as out_file:
+            json.dump(scenes, out_file, sort_keys = True, indent = 4,
+                    ensure_ascii = False)
 
         return json.dumps(scenes)
 
