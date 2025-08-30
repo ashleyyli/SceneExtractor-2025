@@ -17,7 +17,7 @@ from mtcnn_cv2 import MTCNN
 
 
 DATA_DIR = os.getcwd()
-DATA_DIR_NAME = 'frames_phaseflann'
+DATA_DIR_NAME = 'frames_junk'
 TARGET_FPS = 0.5
 SCENE_DETECT_USE_FACE = 'true'
 SCENE_DETECT_USE_OCR = 'true'

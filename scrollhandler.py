@@ -3,53 +3,6 @@ import decord
 import numpy as np
 import cv2
 
-def compare_scroll_difference(curr, ref, width, height):
-    """
-    Compares two frames are scrolled versions of each other
-    
-    Args:
-        curr: (Chronologically earlier) Previous frame.
-        ref: Reference frame.
-        width: Width of the frames.
-        height: Height of the frames.
-    
-    Returns:
-        bool: True if most of curr is contained within next, False otherwise.
-    """
-
-    # All the 6 methods for comparison in a list
-    # methods = ['TM_CCOEFF', 'TM_CCOEFF_NORMED', 'TM_CCORR',
-    #             'TM_CCORR_NORMED', 'TM_SQDIFF', 'TM_SQDIFF_NORMED']
-
-    method = getattr(cv2, 'TM_SQDIFF_NORMED')    
-
-    # Defining region of search
-    img_w = int(width/2)
-    img_h = int(height/2)
-    img_x = int(width/4)
-    img_y = int(height/4)
-
-    # create target (?????)
-    crop_image = curr[img_y:img_y+img_h, img_x:img_x+img_w]
-
-    # Apply template matching
-    res = cv2.matchTemplate(crop_image, ref, method)
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-
-    # Printing
-    print("Min: ", min_val, " ", min_loc)
-    # print("Max: ", max_val, " ", max_loc)
-
-    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
-    if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
-        top_left = min_loc
-    else:
-        top_left = max_loc
-    bottom_right = (top_left[0] + img_w, top_left[1] + img_h)           # how does python scope work???
-    
-    return min_val < 0.005
-
-
 def find_match(curr, ref, width, height, index):
     # Defining region of search
     img_x = int(width/6)
@@ -57,8 +10,7 @@ def find_match(curr, ref, width, height, index):
     img_w = int(2 * width/3)
     img_h = int(2 * height/3)
 
-
-    # create target (?????)
+    # create target (?)
     crop_image = ref[img_y:img_y+img_h, img_x:img_x+img_w]
 
     # Initiate SIFT detector
@@ -81,7 +33,6 @@ def find_match(curr, ref, width, height, index):
     flann = cv2.FlannBasedMatcher(index_params, search_params)
 
     matches = flann.knnMatch(des1, des2, k=2)
-    # print("Num matches: ", len(matches))
 
     # Need to draw only good matches, so create a mask
     matchesMask = [[0,0] for i in range(len(matches))]
@@ -92,12 +43,6 @@ def find_match(curr, ref, width, height, index):
         if m.distance < 0.7 * n.distance:
             matchesMask[i] = [1, 0]
             good.append(m)
-    
-    # print("Good matches: ", len(good))
-    # if len(matches) > 0:
-    #     print("Ratio: ", len(good)/len(matches))
-    # else:
-    #     print("Ratio: undefined")
 
     if len(good) < 100:
         print("Not enough good matches to estimate motion")
@@ -112,15 +57,11 @@ def find_match(curr, ref, width, height, index):
     dx = displacements[:,0] / width
     dy = displacements[:,1] / height
 
-    # print("dx mean and std dev: ", np.mean(dx), np.std(dx))
-    # print("dy mean and std dev: ", np.mean(dy), np.std(dy))
-
     M, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, method=cv2.RANSAC)
 
-    # print("Num inliers:", np.sum(inliers))
-
     inlier_ratio = np.sum(inliers) / len(inliers)
-    if inlier_ratio < 0.3:  # threshold depends on your data
+    # Arbitrary threshold
+    if inlier_ratio < 0.3:  
         print("Reject: not enough inliers")
         return False
 
@@ -129,9 +70,7 @@ def find_match(curr, ref, width, height, index):
     sx = np.sqrt(M[0,0]**2 + M[1,0]**2)  # scale in x
     sy = np.sqrt(M[0,1]**2 + M[1,1]**2)  # scale in y
 
-    # print ("tx:", tx, "ty:", ty, "sx:", sx, "sy:", sy)
-
-
+    # Output result image
     draw_params = dict(matchColor = (0, 255, 0),
                         singlePointColor = (0, 0, 255),
                         matchesMask = matchesMask,
@@ -139,7 +78,6 @@ def find_match(curr, ref, width, height, index):
 
     output = cv2.drawMatchesKnn(crop_image, kp1, curr, kp2, matches, None, **draw_params)
 
-    # Output result
     DATA_DIR = os.getcwd()
     DATA_DIR_NAME = 'test'
     out_directory = os.path.join(DATA_DIR, DATA_DIR_NAME)
@@ -180,7 +118,6 @@ def filter_scrolling(video_path, frame_cuts, width, height):
     frame_vr = vr_full[filtered_frame_cuts[0]]
     reference_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
     reference_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
-    # scores = []
 
     index = 0
     for i in range(1, len(frame_cuts)):
@@ -190,13 +127,13 @@ def filter_scrolling(video_path, frame_cuts, width, height):
         curr_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
         curr_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
 
+        difference = abs(curr_frame - reference_frame)
+        # Arbitrary threshold
+        if ((np.count_nonzero(difference) / curr_frame.size) < 0.05) :
+            print("Duplicate frames")
+            continue;
 
-        # If reference frame is contained within current frame, skip
-        # if compare_scroll_difference(curr_frame, reference_frame, width, height):
-        #     find_match(curr_frame, reference_frame, width, height, i)
-        #     print(f"Frame {frame_cuts[i]} is a scrolling frame, skipping.")
-        #     continue
-
+        # unsure about whether to keep this step
         shift, response = cv2.phaseCorrelate(reference_frame_pc, curr_frame_pc)
         if (response > 0.40):
             dx, dy = shift
@@ -205,16 +142,16 @@ def filter_scrolling(video_path, frame_cuts, width, height):
                 continue
 
         # If reference frame is reasonably found within current frame, skip
-        # Covers some cases template matching does not, but very expensive
+        # Covers some cases template matching does not, but expensive
         if find_match(curr_frame, reference_frame, width, height, i): 
             print(f"Feature match: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
             continue
+
+        print("test")
 
         # Else, add current frame and update reference frame
         filtered_frame_cuts.append(frame_cuts[i])
         reference_frame = curr_frame
         reference_frame_pc = curr_frame_pc
 
-    # print(scores)
     return list(reversed(filtered_frame_cuts))      
-    # return list(reversed(frame_cuts))  

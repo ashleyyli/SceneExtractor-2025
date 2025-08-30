@@ -5,6 +5,7 @@ frames_flann
 frames_phase_correlate
 frames_phaseflann
 frames_scroll
+frames_junk
 test
 Videos
 .DS_Store
