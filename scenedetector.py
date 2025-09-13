@@ -17,7 +17,7 @@ from mtcnn_cv2 import MTCNN
 
 
 DATA_DIR = os.getcwd()
-DATA_DIR_NAME = 'frames_junk'
+DATA_DIR_NAME = 'frames_oflow'
 TARGET_FPS = 0.5
 SCENE_DETECT_USE_FACE = 'true'
 SCENE_DETECT_USE_OCR = 'true'
@@ -539,7 +539,6 @@ def find_scenes(video_path):
         cap.release()
         filtered_frame_cuts = sh.filter_scrolling(video_path, frame_cuts, w, h)
 
-        # print(filtered_frame_cuts[0].dtype)
         filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
         
         # Filter out frames differing only by annotations

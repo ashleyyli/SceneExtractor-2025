@@ -91,6 +91,44 @@ def find_match(curr, ref, width, height, index):
 
     return False
 
+def compute_optical_flow(curr, ref):
+    # Initialize analysis results
+    vertical_motion_magnitudes = []
+    vertical_motion_rewarded_magnitudes = []
+    # vertical_motion_std_devs = []
+    # regionwise_std_devs = []
+
+    prvs = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
+    next = cv2.cvtColor(curr, cv2.COLOR_BGR2GRAY)
+
+    flow = cv2.calcOpticalFlowFarneback(prvs, next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+    vert_flow = flow[..., 1]
+
+    abs_vert_flow = np.abs(vert_flow)
+    dynamic_threshold = 0.005 * np.max(abs_vert_flow)  
+
+    # Mask for significant vertical motion
+    moving_mask = abs_vert_flow > dynamic_threshold
+    significant_motion_values = abs_vert_flow[moving_mask]
+
+    if significant_motion_values.size > 0:
+        # Parameters
+        alpha = 2  # you can tune this
+
+        total_pixels = abs_vert_flow.size
+        num_moving_pixels = moving_mask.sum()
+        coverage_ratio = num_moving_pixels / total_pixels
+
+        weighted_motion = np.sum(significant_motion_values) / total_pixels
+        rewarded_motion = weighted_motion * (coverage_ratio ** alpha)
+    else:
+        weighted_motion = 0
+        rewarded_motion = 0
+    
+    print(rewarded_motion)
+
+    return rewarded_motion > 0.0001
+
 
 def filter_scrolling(video_path, frame_cuts, width, height):
     """
@@ -117,41 +155,43 @@ def filter_scrolling(video_path, frame_cuts, width, height):
     # If true (difference below threshold),  do not add to filtered_frame_cuts; else add 
     frame_vr = vr_full[filtered_frame_cuts[0]]
     reference_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
-    reference_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
+    # reference_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
 
-    index = 0
+    # index = 0
     for i in range(1, len(frame_cuts)):
         print("\n", i)
         print(f"Comparing frame {frame_cuts[i]} with reference frame {filtered_frame_cuts[-1]}")
         frame_vr = vr_full[frame_cuts[i]]
         curr_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
-        curr_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
+        # curr_frame_pc = np.float32(cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2GRAY))
 
-        difference = abs(curr_frame - reference_frame)
+        # difference = abs(curr_frame - reference_frame)
         # Arbitrary threshold
-        if ((np.count_nonzero(difference) / curr_frame.size) < 0.05) :
-            print("Duplicate frames")
-            continue;
+        # if ((np.count_nonzero(difference) / curr_frame.size) < 0.05) :
+        #     print("Duplicate frames")
+        #     continue;
 
         # unsure about whether to keep this step
-        shift, response = cv2.phaseCorrelate(reference_frame_pc, curr_frame_pc)
-        if (response > 0.40):
-            dx, dy = shift
-            if (abs(dy) > 1):
-                print(f"Phase correlation: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
-                continue
+        # shift, response = cv2.phaseCorrelate(reference_frame_pc, curr_frame_pc)
+        # if (response > 0.40):
+        #     dx, dy = shift
+        #     if (abs(dy) > 1):
+        #         print(f"Phase correlation: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
+        #         continue
 
         # If reference frame is reasonably found within current frame, skip
-        # Covers some cases template matching does not, but expensive
-        if find_match(curr_frame, reference_frame, width, height, i): 
-            print(f"Feature match: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
-            continue
+        # if find_match(curr_frame, reference_frame, width, height, i): 
+        #     print(f"Feature match: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
+        #     continue
 
-        print("test")
+        # Optical flow scroll detector
+        if (compute_optical_flow(curr_frame, reference_frame)) :
+            print(f"Optical: Frame {frame_cuts[i]} is a scrolling frame, skipping.")
+            continue
 
         # Else, add current frame and update reference frame
         filtered_frame_cuts.append(frame_cuts[i])
         reference_frame = curr_frame
-        reference_frame_pc = curr_frame_pc
+        # reference_frame_pc = curr_frame_pc
 
     return list(reversed(filtered_frame_cuts))      
