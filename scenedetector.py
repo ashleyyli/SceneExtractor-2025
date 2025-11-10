@@ -539,7 +539,6 @@ def find_scenes(video_path):
         cap.release()
         filtered_frame_cuts = sh.filter_scrolling(video_path, frame_cuts, w, h)
 
-        # print(filtered_frame_cuts[0].dtype)
         filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
         
         # Filter out frames differing only by annotations
