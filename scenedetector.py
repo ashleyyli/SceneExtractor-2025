@@ -17,7 +17,7 @@ from mtcnn_cv2 import MTCNN
 
 
 DATA_DIR = os.getcwd()
-DATA_DIR_NAME = 'frames_phaseflann'
+DATA_DIR_NAME = 'test2'
 TARGET_FPS = 0.5
 SCENE_DETECT_USE_FACE = 'true'
 SCENE_DETECT_USE_OCR = 'true'
@@ -543,7 +543,14 @@ def find_scenes(video_path):
         filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
         
         # Filter out frames differing only by annotations
-        # filtered_frame_cuts = ah.filter_annotations(video_path, frame_cuts)
+        print(">>> running annotations now")
+        filtered_frame_cuts = ah.filter_annotations(video_path, frame_cuts)
+        filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
+
+        print(">>> printing annotated frames")
+        
+
+
 
         # Image Extraction and OCR
         scenes = extract_scene_information(video_path, timestamps, filtered_frame_cuts, everyN, start_time)
@@ -555,6 +562,7 @@ def find_scenes(video_path):
             json.dump(scenes, out_file, sort_keys = True, indent = 4,
                     ensure_ascii = False)
 
+        print(">>> finished running find_scenes")
         return json.dumps(scenes)
 
     except Exception as e:
