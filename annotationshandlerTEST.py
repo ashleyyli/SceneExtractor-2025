@@ -151,7 +151,7 @@ def filter_annotations(video_path, frame_cuts):
         output_dir = "subtracted"
         os.makedirs(output_dir, exist_ok=True)
 
-        output_path = os.path.join(output_dir, f"subtracted{i}.png")
+        output_path = os.path.join(output_dir, f"subtracted{len(frame_cuts) - i}.png")
         cv2.imwrite(output_path, processed_reference_frame)
 
     return list(reversed(filtered_frame_cuts))  

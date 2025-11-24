@@ -60,3 +60,16 @@ Install python dependencies
 ```
 pip install -r requirements.txt
 ```
+
+# Annotations test use
+
+After running 
+```python
+python main.py example.mp4
+```
+
+there should be a folder titled `frames_phaseflann` with the selected frames after filtering scrolling and all other processes (annotation filtering comes last). 
+
+masked frames go into folder titled `masked`, then frames are subtracted and the amount of pixels shared are compared, if it is under a certain threshold the frames are denoted 'different' and get put into `subtracted` folder.
+
+Corresponding frames are put into whatever directory specified in `scenedetector.py` as `DATA_DIR_NAME`
