@@ -93,12 +93,12 @@ def filter_annotations(video_path, frame_cuts):
     # If true (difference below threshold),  do not add to filtered_frame_cuts; else add 
     frame_vr = vr_full[filtered_frame_cuts[0]]
     reference_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
-    processed_reference_frame = bgremove1(reference_frame, 0)
+    processed_reference_frame = bgremove1(reference_frame)
 
     for i in range(1, len(frame_cuts)):
         frame_vr = vr_full[frame_cuts[i]]
         curr_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
-        processed_curr_frame = bgremove1(curr_frame, i)
+        processed_curr_frame = bgremove1(curr_frame)
 
         # If current frame is contained within reference frame, skip
         if compare_annotations_difference(processed_curr_frame, processed_reference_frame):

@@ -4,16 +4,19 @@ import numpy as np
 import cv2
 
 def find_match(curr, ref, width, height, index):
-    # Defining region of search
+    # Search for the middle of reference frame in the current frame
+    # Ignore edges because they can cloud motion estimation
     img_x = int(width/6)
-    img_y = int(height/6)    
+    img_y = int(height/6)
     img_w = int(2 * width/3)
     img_h = int(2 * height/3)
 
-    # create target (?)
+    # Create target
     crop_image = ref[img_y:img_y+img_h, img_x:img_x+img_w]
 
-    # Initiate SIFT detector
+    # Initiate scale-invariant feature detector (Scale Invariant Feature 
+    # Transform) from Lowe's paper
+    # https://doi.org/10.1023/B:VISI.0000029664.99615.94
     sift = cv2.SIFT_create()
 
     # Find the keypoints and descriptors with SIFT
@@ -22,29 +25,38 @@ def find_match(curr, ref, width, height, index):
 
     # If no features were found in either image, skip
     if des1 is None or des2 is None or len(kp1) < 2 or len(kp2) < 2:
-        print(f"No descriptors found (des1={des1 is None}, des2={des2 is None}) at index {index}")
+        print(f"No descriptors found (crop_image={des1 is None}, curr={des2 is None}) at index {index}")
         return False
 
     # FLANN parameters
-    FLANN_INDEX_KDTREE = 1
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    search_params = dict(checks = 50)
+    FLANN_INDEX_KDTREE = 1  # Use k-d trees for nearest neighbor search
+    NUM_TREES = 5  # Default, more trees is faster but uses more memory
+    NUM_CHECKS = 50  # Number of neighbors to check
+    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = NUM_TREES) 
+    search_params = dict(checks = NUM_CHECKS)  
 
     flann = cv2.FlannBasedMatcher(index_params, search_params)
 
     matches = flann.knnMatch(des1, des2, k=2)
 
-    # Need to draw only good matches, so create a mask
+    # DEBUG: Need to draw only good matches, so create a mask
     matchesMask = [[0,0] for i in range(len(matches))]
 
-    # Ratio test as per Lowe's paper
+    # Ratio test as per Lowe's paper (7.1 Keypoint matching)
+    DISTANCE_RATIO = 0.7  
     good = []
     for i,(m,n) in enumerate(matches):
-        if m.distance < 0.7 * n.distance:
-            matchesMask[i] = [1, 0]
+        if m.distance < DISTANCE_RATIO * n.distance:
             good.append(m)
 
-    if len(good) < 100:
+    print("Matches: ", len(matches))
+    print("Good: ", len(good))
+    print("Good ratio: ", len(good)/len(matches))
+
+    # If fewer than MIN_GOOD found between frames, then it's unlikely
+    # they are scrolled versions of each other
+    MIN_GOOD_RATIO = 0.2  # Increase to require more matches for two frames to be considered related
+    if len(good)/len(matches) < MIN_GOOD_RATIO:
         print("Not enough good matches to estimate motion")
         return False
 
@@ -54,18 +66,28 @@ def find_match(curr, ref, width, height, index):
 
     M, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, method=cv2.RANSAC)
 
+    # Fraction of matched features that agree with the estimated motion
     inlier_ratio = np.sum(inliers) / len(inliers)
-    # Arbitrary threshold
-    if inlier_ratio < 0.3:  
+    print("Inlier ratio: ", inlier_ratio)       # DEBUG: Print inlier ratio
+    
+    # If not enough agree, it's unlikely the frames are scrolled versions of each other
+    MIN_INLIER_RATIO = 0.3 # Increase to require more consistent motion between frames 
+    if inlier_ratio < MIN_INLIER_RATIO:
         print("Reject: not enough inliers")
         return False
 
-    tx = M[0,2]
-    ty = M[1,2]
+    # Calculating translation and scale
+    tx = M[0,2]  # translation in x
+    ty = M[1,2]  # translation in Y
     # sx = np.sqrt(M[0,0]**2 + M[1,0]**2)  # scale in x
     sy = np.sqrt(M[0,1]**2 + M[1,1]**2)  # scale in y
 
-    # Output result image
+    # DEBUG: printing translation and scale
+    print("x-shift: ", tx)
+    print("y-shift: ", ty)
+    print("y-scale: ", sy)
+
+    # DEBUG: Output result image
     draw_params = dict(matchColor = (0, 255, 0),
                         singlePointColor = (0, 0, 255),
                         matchesMask = matchesMask,
@@ -74,7 +96,7 @@ def find_match(curr, ref, width, height, index):
     output = cv2.drawMatchesKnn(crop_image, kp1, curr, kp2, matches, None, **draw_params)
 
     DATA_DIR = os.getcwd()
-    DATA_DIR_NAME = 'test'
+    DATA_DIR_NAME = 'full_test_matches'
     out_directory = os.path.join(DATA_DIR, DATA_DIR_NAME)
     os.makedirs(out_directory, exist_ok=True)
     img_file = os.path.join(
