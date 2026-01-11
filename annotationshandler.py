@@ -1,6 +1,7 @@
 import decord
 import numpy as np
 import cv2
+cv2.setNumThreads(2)
 
 def bgremove1(myimage):
     """
@@ -65,7 +66,9 @@ def compare_annotations_difference(curr, ref):
     changed_pixels = cv2.countNonZero(diff)
     total_pixels = diff.size
 
-    return changed_pixels/total_pixels < 0.055  # adjustable threshold, we need to test
+    print(f"Changed percentage: {changed_pixels/total_pixels}")
+
+    return changed_pixels/total_pixels <= 0.01  # adjustable threshold, we need to test
 
 
 def filter_annotations(video_path, frame_cuts):
@@ -83,7 +86,6 @@ def filter_annotations(video_path, frame_cuts):
     # Reverse frame_cuts to enumerate backwards
     frame_cuts = list(reversed(frame_cuts))
 
-    # TODO: Decide whether to return new frames or modify array in place
     filtered_frame_cuts = [frame_cuts[0]] 
 
     # Load video reader
@@ -94,18 +96,23 @@ def filter_annotations(video_path, frame_cuts):
     frame_vr = vr_full[filtered_frame_cuts[0]]
     reference_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
     processed_reference_frame = bgremove1(reference_frame)
-
+    last_changing_frame = filtered_frame_cuts[0]
+    
     for i in range(1, len(frame_cuts)):
         frame_vr = vr_full[frame_cuts[i]]
         curr_frame = cv2.cvtColor(frame_vr.asnumpy(), cv2.COLOR_RGB2BGR)
         processed_curr_frame = bgremove1(curr_frame)
 
-        # If current frame is contained within reference frame, skip
+        # If current frame is contained within reference frame, skip, the slide is still changing
         if compare_annotations_difference(processed_curr_frame, processed_reference_frame):
+            processed_reference_frame = processed_curr_frame.copy()
+            last_changing_frame = frame_cuts[i]
             continue
 
         # Else, add current frame and update reference frame (processed_reference_frame)
-        filtered_frame_cuts.append(frame_cuts[i])
+        # The slide finished changing
+        filtered_frame_cuts.append(last_changing_frame)
         processed_reference_frame = processed_curr_frame.copy() # put this copy part so it doesnt modify
+        last_changing_frame = frame_cuts[i]
 
     return list(reversed(filtered_frame_cuts))  
