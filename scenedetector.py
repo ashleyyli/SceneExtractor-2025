@@ -17,7 +17,7 @@ from mtcnn_cv2 import MTCNN
 
 
 DATA_DIR = os.getcwd()
-DATA_DIR_NAME = 'full_test'
+DATA_DIR_NAME = '2022_RESULTS'
 TARGET_FPS = 0.5
 SCENE_DETECT_USE_FACE = 'true'
 SCENE_DETECT_USE_OCR = 'true'
@@ -79,7 +79,7 @@ def require_face_result(curr_frame):
 
 def require_ssim_with_face_detection(curr_frame, curr_result, last_frame, last_result):
     """
-    Given two frames with their face & upper body bounding boxes, 
+    Given two frames with their face & upper body bounding boxes,
         find SSIM between them after removing face & upper body
 
     Parameters:
@@ -389,28 +389,29 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
         cv2.imwrite(img_file, frame)
 
         # OCR generation
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        str_text = pytesseract.image_to_data(
-            gray_frame, output_type='dict')
+        # gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # str_text = pytesseract.image_to_data(
+        #     gray_frame, output_type='dict')
 
         phrases = []
         last_block = -1
         phrase = []
-        for i in range(len(str_text['conf'])):
-            if int(float(str_text['conf'][i])) >= OCR_CONFIDENCE and len(str_text['text'][i].strip()) > 0:
-                curr_block = str_text['block_num'][i]
-                if curr_block != last_block:
-                    if len(phrase) > 0:
-                        phrases.append(' '.join(phrase))
-                    last_block = curr_block
-                    phrase = []
-                phrase.append(str_text['text'][i])
-        if len(phrase) > 0:
-            phrases.append(' '.join(phrase))
+        # for i in range(len(str_text['conf'])):
+        #     if int(float(str_text['conf'][i])) >= OCR_CONFIDENCE and len(str_text['text'][i].strip()) > 0:
+        #         curr_block = str_text['block_num'][i]
+        #         if curr_block != last_block:
+        #             if len(phrase) > 0:
+        #                 phrases.append(' '.join(phrase))
+        #             last_block = curr_block
+        #             phrase = []
+        #         phrase.append(str_text['text'][i])
+        # if len(phrase) > 0:
+        #     phrases.append(' '.join(phrase))
 
         # Title generation
         frame_height, frame_width, frame_channels = frame.shape
-        title = td.title_detection(str_text, frame_height, frame_width)
+        # title = td.title_detection(str_text, frame_height, frame_width)
+        title = ""
 
         # we dont want microsecond accuracy; the [:12] cuts off the last 3 unwanted digits
         scene['start'] = datetime.utcfromtimestamp(timestamps[scene['frame_start'] // everyN]).strftime(
@@ -419,7 +420,7 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
             :12]
         scene['img_file'] = img_file
         # Internal debug format; subject to change uses phrases instead
-        scene['raw_text'] = str_text
+        scene['raw_text'] = ""
         scene['phrases'] = phrases  # list of strings
         scene['title'] = title  # detected title as string
 
@@ -427,9 +428,9 @@ def extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_
         # Leading to OOM
         del frame_vr
         del frame
-        del gray_frame
+        # del gray_frame
         
-        del str_text
+        # del str_text
 
     return scenes
 
@@ -533,23 +534,23 @@ def find_scenes(video_path):
 
         # Filter out frames differing only by scrolling
         # there must be a better way to get height and width
-        cap = cv2.VideoCapture(video_path)
-        ret,frame = cap.read()
-        h, w, channels = frame.shape
-        cap.release()
-        filtered_frame_cuts = sh.filter_scrolling(video_path, frame_cuts, w, h)
+        # cap = cv2.VideoCapture(video_path)
+        # ret,frame = cap.read()
+        # h, w, channels = frame.shape
+        # cap.release()
+        # filtered_frame_cuts = sh.filter_scrolling(video_path, frame_cuts, w, h)
 
-        filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
+        # filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
         
         # Filter out frames differing only by annotations
-        print(">>> running annotations now")
-        filtered_frame_cuts = ah.filter_annotations(video_path, filtered_frame_cuts)
-        filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
+        # print(">>> running annotations now")
+        # filtered_frame_cuts = ah.filter_annotations(video_path, filtered_frame_cuts)
+        # filtered_frame_cuts = [int(x) for x in filtered_frame_cuts]
 
-        print(">>> printing annotated frames")
+        # print(">>> printing annotated frames")
 
         # Image Extraction and OCR
-        scenes = extract_scene_information(video_path, timestamps, filtered_frame_cuts, everyN, start_time)
+        scenes = extract_scene_information(video_path, timestamps, frame_cuts, everyN, start_time)
 
         # Full JSON output 
         json_name = short_file_name + '.json'
